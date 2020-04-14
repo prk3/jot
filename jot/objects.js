@@ -1,43 +1,43 @@
 /* A library of operations for objects (i.e. JSON objects/Javascript associative arrays).
 
-   new objects.PUT(key, value)
-    
-    Creates a property with the given value. This is an alias for
-    new objects.APPLY(key, new values.SET(value)).
+	 new objects.PUT(key, value)
 
-   new objects.REM(key)
-    
-    Removes a property from an object. This is an alias for
-    new objects.APPLY(key, new values.SET(objects.MISSING)).
+	  Creates a property with the given value. This is an alias for
+	  new objects.APPLY(key, new values.SET(value)).
 
-   new objects.APPLY(key, operation)
-   new objects.APPLY({key: operation, ...})
+	 new objects.REM(key)
 
-    Applies any operation to a property, or multiple operations to various
-    properties, on the object.
+	  Removes a property from an object. This is an alias for
+	  new objects.APPLY(key, new values.SET(objects.MISSING)).
 
-    Use any operation defined in any of the modules depending on the data type
-    of the property. For instance, the operations in values.js can be
-    applied to any property. The operations in sequences.js can be used
-    if the property's value is a string or array. And the operations in
-    this module can be used if the value is another object.
+	 new objects.APPLY(key, operation)
+	 new objects.APPLY({key: operation, ...})
 
-    Supports a conflictless rebase with itself with the inner operations
-    themselves support a conflictless rebase. It does not generate conflicts
-    with any other operations in this module.
+	  Applies any operation to a property, or multiple operations to various
+	  properties, on the object.
 
-    Example:
-    
-    To replace the value of a property with a new value:
-    
-      new objects.APPLY("key1", new values.SET("value"))
+	  Use any operation defined in any of the modules depending on the data type
+	  of the property. For instance, the operations in values.js can be
+	  applied to any property. The operations in sequences.js can be used
+	  if the property's value is a string or array. And the operations in
+	  this module can be used if the value is another object.
+
+	  Supports a conflictless rebase with itself with the inner operations
+	  themselves support a conflictless rebase. It does not generate conflicts
+	  with any other operations in this module.
+
+	  Example:
+
+	  To replace the value of a property with a new value:
+
+	    new objects.APPLY("key1", new values.SET("value"))
 
 	or
 
-      new objects.APPLY({ key1: new values.SET("value") })
+	    new objects.APPLY({ key1: new values.SET("value") })
 
-   */
-   
+	 */
+
 var util = require('util');
 
 var deepEqual = require("deep-equal");
@@ -120,7 +120,7 @@ exports.APPLY.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.APPLY(ops);
 }
 
-exports.APPLY.prototype.apply = function (document) {
+exports.APPLY.prototype.apply = function (document, meta, pointer = "") {
 	/* Applies the operation to a document. Returns a new object that is
 	   the same type as document but with the change made. */
 
@@ -129,11 +129,9 @@ exports.APPLY.prototype.apply = function (document) {
 	for (var k in document)
 		d[k] = document[k];
 
-	// Apply. Pass the object and key down in the second argument
-	// to apply so that values.SET can handle the special MISSING
-	// value.
+	// Apply.
 	for (var key in this.ops) {
-		var value = this.ops[key].apply(d[key], [d, key]);
+		var value = this.ops[key].apply(d[key], meta, pointer + '/' + key);
 		if (value === exports.MISSING)
 			delete d[key]; // key was removed
 		else

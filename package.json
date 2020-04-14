@@ -1,7 +1,11 @@
 {
-  "name": "jot",
-  "version": "0.0.1",
-  "description": "JSON Operational Transformation",
+  "author": {
+    "name": "Joshua Tauberer"
+  },
+  "bugs": {
+    "url": "https://github.com/joshdata/jot/issues"
+  },
+  "bundleDependencies": false,
   "dependencies": {
     "deep-equal": "^2.0.1",
     "diff": "^4.0.2",
@@ -9,16 +13,20 @@
     "jsonpatch": "*",
     "shallow-clone": "^3.0.1"
   },
+  "deprecated": false,
+  "description": "JSON Operational Transformation",
+  "devDependencies": {
+    "connect": "*",
+    "tap": "*"
+  },
+  "homepage": "https://github.com/joshdata/jot#readme",
+  "name": "jot",
   "repository": {
     "type": "git",
     "url": "git://github.com/joshdata/jot.git"
   },
-  "author": "Joshua Tauberer",
   "scripts": {
     "test": "tap --cov tests/*.js"
   },
-  "devDependencies": {
-    "connect": "*",
-    "tap": "*"
-  }
+  "version": "0.0.1"
 }

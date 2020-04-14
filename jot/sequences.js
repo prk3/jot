@@ -1,44 +1,44 @@
 /* An operational transformation library for sequence-like objects,
-   i.e. strings and arrays.
+	 i.e. strings and arrays.
 
-   The main operation provided by this library is PATCH, which represents
-   a set of non-overlapping changes to a string or array. Each change,
-   called a hunk, applies an operation to a subsequence -- i.e. a sub-string
-   or a slice of the array. The operation's .apply method yields a new
-   sub-sequence, and they are stitched together (along with unchanged elements)
-   to form the new document that results from the PATCH operation.
+	 The main operation provided by this library is PATCH, which represents
+	 a set of non-overlapping changes to a string or array. Each change,
+	 called a hunk, applies an operation to a subsequence -- i.e. a sub-string
+	 or a slice of the array. The operation's .apply method yields a new
+	 sub-sequence, and they are stitched together (along with unchanged elements)
+	 to form the new document that results from the PATCH operation.
 
-   The internal structure of the PATCH operation is an array of hunks as
-   follows:
+	 The internal structure of the PATCH operation is an array of hunks as
+	 follows:
 
-   new sequences.PATCH(
-     [
-       { offset: ..., # unchanged elements to skip before this hunk
-         length: ..., # length of subsequence modified by this hunk
-         op: ...      # jot operation to apply to the subsequence
-       },
-       ...
-     ]
-    )
+	 new sequences.PATCH(
+	   [
+	     { offset: ..., # unchanged elements to skip before this hunk
+	       length: ..., # length of subsequence modified by this hunk
+	       op: ...      # jot operation to apply to the subsequence
+	     },
+	     ...
+	   ]
+	  )
 
-   The inner operation must be one of NO_OP, SET, and MAP (or any
-   operation that defines "get_length_change" and "decompose" functions
-   and whose rebase always yields an operation that also satisfies these
-   same constraints.)
+	 The inner operation must be one of NO_OP, SET, and MAP (or any
+	 operation that defines "get_length_change" and "decompose" functions
+	 and whose rebase always yields an operation that also satisfies these
+	 same constraints.)
 
 
-   This library also defines the MAP operation, which applies a jot
-   operation to every element of a sequence. The MAP operation is
-   also used with length-one hunks to apply an operation to a single
-   element. On strings, the MAP operation only accepts inner operations
-   that yield back single characters so that a MAP on a string does
-   not change the string's length.
+	 This library also defines the MAP operation, which applies a jot
+	 operation to every element of a sequence. The MAP operation is
+	 also used with length-one hunks to apply an operation to a single
+	 element. On strings, the MAP operation only accepts inner operations
+	 that yield back single characters so that a MAP on a string does
+	 not change the string's length.
 
-   The internal structure of the MAP operation is:
+	 The internal structure of the MAP operation is:
 
-   new sequences.MAP(op)
- 
-   Shortcuts for constructing useful PATCH operations are provided:
+	 new sequences.MAP(op)
+
+	 Shortcuts for constructing useful PATCH operations are provided:
 
 		new sequences.SPLICE(pos, length, value)
 
@@ -49,9 +49,9 @@
 				 length: length,
 				 op: new values.SET(value)
 				 }])
-			 
+
 			 i.e. replace elements with other elements
-		
+
 		new sequences.ATINDEX(pos, op)
 
 			 Equivalent to:
@@ -61,7 +61,7 @@
 				 length: 1,
 				 op: new sequences.MAP(op)
 				 }])
-			 
+
 			 i.e. apply the operation to the single element at pos
 
 		new sequences.ATINDEX({ pos: op, ... })
@@ -71,7 +71,7 @@
 		Supports a conflictless rebase with other PATCH operations.
 
 	 */
-	 
+
 var util = require('util');
 
 var deepEqual = require("deep-equal");
@@ -80,6 +80,7 @@ var shallow_clone = require('shallow-clone');
 var jot = require("./index.js");
 var values = require("./values.js");
 var LIST = require("./lists.js").LIST;
+var selection = require("./selection.js");
 
 // utilities
 
@@ -117,13 +118,13 @@ exports.PATCH = function () {
 	/* An operation that replaces a subrange of the sequence with new elements. */
 	if (arguments[0] === "__hmm__") return; // used for subclassing
 	if (arguments.length != 1)
-		throw new Error("Invaid Argument");
+		throw new Error("Invalid Argument");
 
 	this.hunks = arguments[0];
 
 	// Sanity check & freeze hunks.
 	if (!Array.isArray(this.hunks))
-		throw new Error("Invaid Argument");
+		throw new Error("Invalid Argument");
 	this.hunks.forEach(function(hunk) {
 		if (typeof hunk.offset != "number")
 			throw new Error("Invalid Argument (hunk offset not a number)");
@@ -225,7 +226,7 @@ exports.PATCH.prototype.inspect = function(depth) {
 exports.PATCH.prototype.visit = function(visitor) {
 	// A simple visitor paradigm. Replace this operation instance itself
 	// and any operation within it with the value returned by calling
-	// visitor on itself, or if the visitor returns anything falsey
+	// visitor on itself, or if the visitor returns anything falsy
 	// (probably undefined) then return the operation unchanged.
 	var ret = new exports.PATCH(this.hunks.map(function(hunk) {
 		var ret = shallow_clone(hunk);
@@ -252,13 +253,13 @@ exports.PATCH.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.PATCH(hunks);
 }
 
-exports.PATCH.prototype.apply = function (document) {
+exports.PATCH.prototype.apply = function (document, meta, path = '') {
 	/* Applies the operation to a document. Returns a new sequence that is
 		 the same type as document but with the hunks applied. */
-	
+
 	var index = 0;
 	var ret = document.slice(0,0); // start with an empty document
-	
+
 	this.hunks.forEach(function(hunk) {
 		if (index + hunk.offset + hunk.length > document.length)
 			throw new Error("offset past end of document");
@@ -267,8 +268,9 @@ exports.PATCH.prototype.apply = function (document) {
 		ret = concat2(ret, document.slice(index, index+hunk.offset));
 		index += hunk.offset;
 
-		// Append new content.
-		var new_value = hunk.op.apply(document.slice(index, index+hunk.length));
+	  // Append new content.
+	  // TODO transform path somehow?
+		var new_value = hunk.op.apply(document.slice(index, index+hunk.length), meta, path);
 
 		if (typeof document == "string" && typeof new_value != "string")
 			throw new Error("operation yielded invalid substring");
@@ -280,10 +282,42 @@ exports.PATCH.prototype.apply = function (document) {
 		// Advance counter.
 		index += hunk.length;
 	});
-	
+
 	// Append unchanged content after the last hunk.
 	ret = concat2(ret, document.slice(index));
-	
+
+	// Update selections.
+	if (meta && meta.in) {
+		var documentSelections = Object.assign(
+			{},
+			(meta.out && meta.out.selections) || meta.in.selections || {},
+		);
+
+		if (documentSelections[path]) {
+			var fieldSelections = Object.assign({}, documentSelections[path] || {});
+
+			this.hunks.forEach(function (hunk) {
+				if (!(hunk.op instanceof values.SET) || (hunk.length === 0 && hunk.op.value.length === 0)) {
+					return;
+				}
+
+				for (var id in fieldSelections) {
+					fieldSelections[id] = selection.adjustRange(
+						fieldSelections[id],
+						hunk.offset,
+						hunk.length,
+						hunk.op.value.length
+					);
+				}
+			});
+			documentSelections[path] = fieldSelections;
+		}
+		if (!meta.out) {
+			meta.out = {};
+		}
+		meta.out.selections = documentSelections;
+	}
+
 	return ret;
 }
 
@@ -314,7 +348,7 @@ exports.PATCH.prototype.simplify = function () {
 
 	function handle_hunk(hunk) {
 		var op = hunk.op.simplify();
-		
+
 		if (op.isNoOp()) {
 			// Drop it, but adjust future offsets.
 			doffset += hunk.offset + hunk.length;
@@ -329,16 +363,16 @@ exports.PATCH.prototype.simplify = function () {
 			&& hunk.offset == 0
 			&& doffset == 0
 			) {
-			
+
 			// The hunks are adjacent. We can combine them
 			// if one of the operations is a SET and the other
 			// is a SET or a MAP containing a SET.
-			// We can't combine two adjancent MAP->SET's because
+			// We can't combine two adjacent MAP->SET's because
 			// we wouldn't know whether the combined value (in
 			// a SET) should be a string or an array.
 			if ((hunks[hunks.length-1].op instanceof values.SET
 				|| (hunks[hunks.length-1].op instanceof exports.MAP && hunks[hunks.length-1].op.op instanceof values.SET))
-			 && (hunk.op instanceof values.SET || 
+			 && (hunk.op instanceof values.SET ||
 			 	  (hunk.op instanceof exports.MAP && hunk.op.op instanceof values.SET) )
 			 && doctype != null) {
 
@@ -385,11 +419,11 @@ exports.PATCH.prototype.simplify = function () {
 		});
 		doffset = 0;
 	}
-	
+
 	this.hunks.forEach(handle_hunk);
 	if (hunks.length == 0)
 		return new values.NO_OP();
-	
+
 	return new exports.PATCH(hunks);
 }
 
@@ -429,7 +463,7 @@ function compose_patches(a, b) {
 	// where the index into the (hypothetical) sequence that results *after*
 	// a is applied lines up with the index into the (hypothetical) sequence
 	// before b is applied.
-	
+
 	var hunks = [];
 	var index = 0;
 
@@ -465,10 +499,10 @@ function compose_patches(a, b) {
 			}
 		}
 	}
-	
+
 	var a_state = make_state(a, 0),
 	    b_state = make_state(b, 1);
-	
+
 	while (!a_state.empty() || !b_state.empty()) {
 		// Only operations in 'a' are remaining.
 		if (b_state.empty()) {
@@ -651,7 +685,7 @@ function rebase_patches(a, b, conflictless) {
 	// We do this as if we are zipping up two sequences, where the index into
 	// the (hypothetical) sequence, before either operation applies, lines
 	// up across the two operations.
-	
+
 	function make_state(op) {
 		return {
 			old_index: 0,
@@ -683,10 +717,10 @@ function rebase_patches(a, b, conflictless) {
 			}
 		}
 	}
-	
+
 	var a_state = make_state(a),
 	    b_state = make_state(b);
-	
+
 	while (!a_state.empty() || !b_state.empty()) {
 		// Only operations in 'a' are remaining.
 		if (b_state.empty()) {
@@ -704,7 +738,7 @@ function rebase_patches(a, b, conflictless) {
 		if (a_state.start() == b_state.start()
 			&& a_state.old_hunks[0].length == 0
 			&& b_state.old_hunks[0].length == 0) {
-			
+
 			// This is a conflict because we don't know which side
 			// gets inserted first.
 			if (!conflictless)
@@ -892,6 +926,10 @@ exports.PATCH.prototype.rebase_functions = [
 	[exports.PATCH, function(other, conflictless) {
 		// Return the new operations.
 		return rebase_patches(this, other, conflictless);
+	}],
+	[selection.SELECT, function(other, conflictless) {
+		// Selections will be fixed in apply method.
+		return [this, other];
 	}]
 ];
 
@@ -929,7 +967,7 @@ exports.MAP.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.MAP(jot.opFromJSON(json.op, protocol_version, op_map));
 }
 
-exports.MAP.prototype.apply = function (document) {
+exports.MAP.prototype.apply = function (document, meta, path = '') {
 	/* Applies the operation to a document. Returns a new sequence that is
 		 the same type as document but with the element modified. */
 
@@ -941,10 +979,10 @@ exports.MAP.prototype.apply = function (document) {
 	// Clone array.
 	else
 		d = document.slice(); // clone
-	
+
 	// Apply operation to each element.
 	for (var i = 0; i < d.length; i++) {
-		d[i] = this.op.apply(d[i])
+		d[i] = this.op.apply(d[i], meta, path);
 
 		// An operation on strings must return a single character.
 		if (typeof document == 'string' && (typeof d[i] != 'string' || d[i].length != 1))
@@ -963,7 +1001,7 @@ exports.MAP.prototype.simplify = function () {
 		 of this operation.*/
 	var op = this.op.simplify();
 	if (op instanceof values.NO_OP)
-		return new values.NO_OP();	   
+		return new values.NO_OP();
 	return this;
 }
 

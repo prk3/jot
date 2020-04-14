@@ -50,13 +50,13 @@ function diff(a, b, options) {
 			size: JSON.stringify(a).length
 		};
 	}
-	
+
 	if (ta == "string" && tb == "string")
 		return diff_strings(a, b, options);
 
 	if (ta == "array" && tb == "array")
 		return diff_arrays(a, b, options);
-	
+
 	if (ta == "object" && tb == "object")
 		return diff_objects(a, b, options);
 
@@ -82,7 +82,7 @@ function diff_strings(a, b, options) {
 	// Use the 'diff' package to compare two strings and convert
 	// the output to a jot.LIST.
 	var diff = require("diff");
-	
+
 	var method = "Chars";
 	if (options.words)
 		method = "Words";
@@ -90,7 +90,7 @@ function diff_strings(a, b, options) {
 		method = "Lines";
 	if (options.sentences)
 		method = "Sentences";
-	
+
 	var total_content = 0;
 	var changed_content = 0;
 
@@ -99,7 +99,7 @@ function diff_strings(a, b, options) {
 		.map(function(change) {
 			// Increment counter of total characters encountered.
 			total_content += change.value.length;
-			
+
 			if (change.added || change.removed) {
 				// Increment counter of changed characters.
 				changed_content += change.value.length;
@@ -135,7 +135,7 @@ function diff_arrays(a, b, options) {
 	// we can compute the operations for the diffs for the
 	// elements that are lined up (and INS/DEL operations
 	// for elements that are added/removed).
-	
+
 	var generic_diff = require("generic-diff");
 
 	// We'll run generic_diff over an array of indices
@@ -249,7 +249,7 @@ function diff_arrays(a, b, options) {
 		op: new jot.LIST(ops).simplify(),
 		pct: (changed_content+1)/(total_content+1), // avoid divizion by zero
 		size: total_content
-	};		
+	};
 }
 
 function diff_objects(a, b, options) {
@@ -258,7 +258,7 @@ function diff_objects(a, b, options) {
 	var ops = [ ];
 	var total_content = 0;
 	var changed_content = 0;
-	
+
 	// If a key exists in both objects, then assume the key
 	// has not been renamed.
 	for (var key in a) {

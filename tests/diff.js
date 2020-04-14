@@ -35,5 +35,5 @@ test('diff', function(t) {
 
 	test({ "a": ["Hello!", ["Goodbye!"]] }, { "b": ["Hola!", ["Adios!"]] }, { words: true });
 
-    t.end();
+	  t.end();
 });

@@ -189,6 +189,6 @@ test_serialization(new objs.REM("key", "old_value"))
 
 //
 
-    t.end();
+	  t.end();
 });
 

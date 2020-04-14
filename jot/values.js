@@ -14,23 +14,23 @@
 	out. NO_OP is conflictless: It never creates a conflict when
 	rebased against or operations or when other operations are
 	rebased against it.
-	
+
 
 	new values.SET(value)
-	
+
 	The atomic replacement of one value with another. Works for
 	any data type. The SET operation supports a conflictless
 	rebase with all other operations.
-	
+
 
 	new values.MATH(operator, operand)
-	
+
 	Applies a commutative arithmetic function to a number or boolean.
-	
+
 	"add": addition (use a negative number to decrement) (over numbers only)
-	
+
 	"mult": multiplication (use the reciprocal to divide) (over numbers only)
-	
+
 	"rot": addition followed by modulus (the operand is given
 	       as a tuple of the increment and the modulus). The document
 	       object must be a non-negative integer and less than the modulus.
@@ -38,13 +38,13 @@
 	"and": bitwise and (over integers and booleans only)
 
 	"or": bitwise or (over integers and booleans only)
-	
+
 	"xor": bitwise exclusive-or (over integers and booleans
 	       only)
 
 	"not": bitwise not (over integers and booleans only; the operand
 	       is ignored)
-	
+
 	Note that by commutative we mean that the operation is commutative
 	under composition, i.e. add(1)+add(2) == add(2)+add(1).
 
@@ -53,9 +53,9 @@
 
 	MATH supports a conflictless rebase with all other operations if
 	prior document state is provided in the conflictless argument object.
-	
+
 	*/
-	
+
 var util = require('util');
 var deepEqual = require("deep-equal");
 var jot = require("./index.js");
@@ -274,7 +274,7 @@ exports.SET.prototype.rebase_functions = [
 		// other, both are returned as no-ops.
 		if (deepEqual(this.value, other.value, { strict: true }))
 			return [new exports.NO_OP(), new exports.NO_OP()];
-		
+
 		// If they set the document to different values and conflictless is
 		// true, then we clobber the one whose value has a lower sort order.
 		if (conflictless && jot.cmp(this.value, other.value) < 0)
@@ -380,7 +380,7 @@ exports.MATH.prototype.apply = function (document) {
 				return ~document;
 		}
 		throw new Error("MATH operator " + this.operator + " cannot apply to " + document + ".");
-	
+
 	} else if (typeof document == "boolean") {
 		if (this.operator == "and")
 			return document && this.operand;
@@ -391,7 +391,7 @@ exports.MATH.prototype.apply = function (document) {
 		if (this.operator == "not")
 			return !document;
 		throw new Error("MATH operator " + this.operator + " does not apply to boolean values.")
-	
+
 	} else {
 		throw new Error("MATH operations only apply to number and boolean values, not " + jot.type_name(document) + ".")
 	}
@@ -499,7 +499,7 @@ exports.MATH.prototype.atomic_compose = function (other) {
 			return new exports.MATH("and", !this.operand);
 
 	}
-	
+
 	return null; // no composition is possible
 }
 
@@ -515,7 +515,7 @@ exports.MATH.prototype.rebase_functions = [
 			&& (this.operator != "rot" || this.operand[1] == other.operand[1]))
 				return [this, other];
 
-		// When two different operators ocurr simultaneously, then the order matters.
+		// When two different operators occur simultaneously, then the order matters.
 		// Since operators preserve the data type of the document, we know that both
 		// orders are valid. Choose an order based on the operations: We'll put this
 		// first and other second.
@@ -607,7 +607,7 @@ exports.createRandomOp = function(doc, context) {
 					return item1 + item2 + item3;
 				return item1.concat(item2).concat(item3);
 			}
-		
+
 			// expand by elements at start
 			ops.push(function() { return new exports.SET(concat2(doc.slice(0, 1+Math.floor(Math.random()*(doc.length-1))), doc)) });
 			// expand by elements at end

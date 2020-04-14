@@ -18,23 +18,29 @@ exports.add_op = function(constructor, module, opname) {
 
 // Expose the operation classes through the jot library.
 var values = require("./values.js");
-var sequences = require("./sequences.js");
-var objects = require("./objects.js");
-var lists = require("./lists.js");
-var copies = require("./copies.js");
-
 exports.NO_OP = values.NO_OP;
 exports.SET = values.SET;
 exports.MATH = values.MATH;
+
+var sequences = require("./sequences.js");
 exports.PATCH = sequences.PATCH;
 exports.SPLICE = sequences.SPLICE;
 exports.ATINDEX = sequences.ATINDEX;
 exports.MAP = sequences.MAP;
+
+var objects = require("./objects.js");
 exports.PUT = objects.PUT;
 exports.REM = objects.REM;
 exports.APPLY = objects.APPLY;
+
+var lists = require("./lists.js");
 exports.LIST = lists.LIST;
+
+var copies = require("./copies.js");
 exports.COPY = copies.COPY;
+
+var selection = require("./selection.js");
+exports.SELECT = selection.SELECT;
 
 // Expose the diff function too.
 exports.diff = require('./diff.js').diff;
@@ -123,6 +129,7 @@ exports.opFromJSON = function(obj, protocol_version, op_map) {
 		extend_op_map(objects);
 		extend_op_map(lists);
 		extend_op_map(copies);
+		extend_op_map(selection);
 	}
 
 	// Get the operation class.
@@ -186,9 +193,13 @@ exports.BaseOperation.prototype.rebase = function(other, conflictless, debug) {
 	// Run the rebase operation in a's prototype. If a doesn't define it,
 	// check b's prototype. If neither define a rebase operation, then there
 	// is a conflict.
-	for (var i = 0; i < ((this.rebase_functions!=null) ? this.rebase_functions.length : 0); i++) {
-		if (other instanceof this.rebase_functions[i][0]) {
-			var r = this.rebase_functions[i][1].call(this, other, conflictless);
+	var this_rebase_functions = typeof this.rebase_functions === 'function'
+		? this.rebase_functions()
+		: this.rebase_functions || [];
+
+	for (var i = 0; i < this_rebase_functions.length; i++) {
+		if (other instanceof this_rebase_functions[i][0]) {
+			var r = this_rebase_functions[i][1].call(this, other, conflictless);
 			if (r != null && r[0] != null) {
 				if (debug) debug("rebase", this, "on", other, (conflictless ? "conflictless" : ""), ("document" in conflictless ? JSON.stringify(conflictless.document) : ""), "=>", r[0]);
 				return r[0];
@@ -196,11 +207,15 @@ exports.BaseOperation.prototype.rebase = function(other, conflictless, debug) {
 		}
 	}
 
+	var other_rebase_functions = typeof other.rebase_functions === 'function'
+		? other.rebase_functions()
+		: other.rebase_functions || [];
+
 	// Either a didn't define a rebase function for b's data type, or else
 	// it returned null above. We can try running the same logic backwards on b.
-	for (var i = 0; i < ((other.rebase_functions!=null) ? other.rebase_functions.length : 0); i++) {
-		if (this instanceof other.rebase_functions[i][0]) {
-			var r = other.rebase_functions[i][1].call(other, this, conflictless);
+	for (var i = 0; i < other_rebase_functions.length; i++) {
+		if (this instanceof other_rebase_functions[i][0]) {
+			var r = other_rebase_functions[i][1].call(other, this, conflictless);
 			if (r != null && r[1] != null) {
 				if (debug) debug("rebase", this, "on", other, (conflictless ? "conflictless" : ""), ("document" in conflictless ? JSON.stringify(conflictless.document) : ""), "=>", r[0]);
 				return r[1];
@@ -365,17 +380,17 @@ exports.cmp = function(a, b) {
 	// just sort based on the type name.
 	if (exports.type_name(a) != exports.type_name(b)) {
 		return exports.cmp(exports.type_name(a), exports.type_name(b));
-	
+
 	} else if (typeof a == "number") {
 		if (a < b)
 			return -1;
 		if (a > b)
 			return 1;
 		return 0;
-		
+
 	} else if (typeof a == "string") {
 		return a.localeCompare(b);
-	
+
 	} else if (Array.isArray(a)) {
 		// First compare on length.
 		var x = exports.cmp(a.length, b.length);

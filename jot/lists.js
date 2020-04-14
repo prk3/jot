@@ -1,17 +1,18 @@
 /*  This module defines one operation:
-	
+
 	LIST([op1, op2, ...])
-	
+
 	A composition of zero or more operations, given as an array.
 
 	*/
-	
+
 var util = require("util");
 
 var shallow_clone = require('shallow-clone');
 
 var jot = require("./index.js");
-var values = require('./values.js');
+var values = require("./values.js");
+var selection = require("./selection");
 
 exports.module_name = 'lists'; // for serialization/deserialization
 
@@ -54,10 +55,10 @@ exports.LIST.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.LIST(ops);
 }
 
-exports.LIST.prototype.apply = function (document) {
+exports.LIST.prototype.apply = function (document, meta, path = '') {
 	/* Applies the operation to a document.*/
 	for (var i = 0; i < this.ops.length; i++)
-		document = this.ops[i].apply(document);
+		document = this.ops[i].apply(document, meta, path);
 	return document;
 }
 
@@ -108,6 +109,61 @@ exports.LIST.prototype.simplify = function (aggressive) {
 	if (new_ops.length == 1)
 		return new_ops[0];
 
+	// This is a very dirty hack that moves all select ops to the end of the
+	// array and merges them together. It simplifies the new LIST in the end.
+	function is_reduceable(op) {
+		return op instanceof jot.PATCH || op instanceof jot.SELECT;
+	}
+	function is_select(op) {
+		return op instanceof jot.SELECT;
+	}
+	function adjust_select(select, patch) {
+		var newSelections = Object.assign({}, select.selections);
+		patch.hunks.forEach(function (hunk) {
+			if (!(hunk.op instanceof jot.SET) || (hunk.length === 0 && hunk.op.value.length === 0)) {
+				return;
+			}
+			for (var key in newSelections) {
+				if (newSelections[key] !== null) {
+					newSelections[key] = selection.adjustRange(
+						newSelections[key],
+						hunk.offset,
+						hunk.length,
+						hunk.op.value.length
+					);
+				}
+			}
+		});
+		return new jot.SELECT(newSelections);
+	}
+	if (new_ops.every(is_reduceable)) {
+		var first_select_index = new_ops.findIndex(is_select);
+		if (first_select_index === -1 || first_select_index === new_ops.length - 1) {
+			return new exports.LIST(new_ops);
+		}
+
+		var current_select = new_ops[first_select_index];
+		new_ops.splice(first_select_index, 1);
+
+		for (var i = first_select_index; i < new_ops.length; /* no increment */) {
+			if (new_ops[i] instanceof jot.SELECT) {
+				// Merge selects (next select has higher priority).
+				current_select = new jot.SELECT(Object.assign(
+					{},
+					current_select.selections,
+					new_ops[i].selections
+				));
+				new_ops.splice(i, 1);
+			} else {
+				// Adjust ranges against the PATCH op.
+				current_select = adjust_select(current_select, new_ops[i]);
+				i++;
+			}
+		}
+		// Add the reduced select and optimize the array again.
+		return new exports.LIST(new_ops.concat(current_select)).simplify(aggressive);
+	}
+
 	return new exports.LIST(new_ops);
 }
 
@@ -135,7 +191,7 @@ exports.LIST.prototype.atomic_compose = function (other) {
 	if (other instanceof exports.LIST) {
 		if (other.ops.length == 0)
 			return this;
-		
+
 		// concatenate
 		return new exports.LIST(this.ops.concat(other.ops));
 	}
@@ -241,14 +297,14 @@ function rebase_array(base, ops, conflictless, debug) {
 		if (op instanceof jot.LIST) return op.ops;
 		return [op];
 	}
-	
+
 	if (debug) {
 		// Wrap the debug function to emit an extra argument to show depth.
 		debug("rebasing", ops, "on", base, conflictless ? "conflictless" : "", "document" in conflictless ? JSON.stringify(conflictless.document) : "", "...");
 		var original_debug = debug;
 		debug = function() { var args = [">"].concat(Array.from(arguments)); original_debug.apply(null, args); }
 	}
-	
+
 	if (base.length == 1) {
 		// Rebase more than one operation (ops) against a single operation (base[0]).
 
@@ -262,13 +318,13 @@ function rebase_array(base, ops, conflictless, debug) {
 
 		var op1 = ops.slice(0, 1); // first operation
 		var op2 = ops.slice(1); // remaining operations
-		
+
 		var r1 = rebase_array(base, op1, conflictless, debug);
 		if (r1 == null) return null; // rebase failed
-		
+
 		var r2 = rebase_array(op1, base, conflictless, debug);
 		if (r2 == null) return null; // rebase failed (must be the same as r1, so this test should never succeed)
-		
+
 		// For the remainder operations, we have to adjust the 'conflictless' object.
 		// If it provides the base document state, then we have to advance the document
 		// for the application of op1.
@@ -281,7 +337,7 @@ function rebase_array(base, ops, conflictless, debug) {
 
 		var r3 = rebase_array(r2, op2, conflictless2, debug);
 		if (r3 == null) return null; // rebase failed
-		
+
 		// returns a new array
 		return r1.concat(r3);
 
@@ -290,7 +346,7 @@ function rebase_array(base, ops, conflictless, debug) {
 		//
 		// From the second part of the rebase contract, we can rebase ops
 		// against each operation in the base sequentially (base[0], base[1], ...).
-		
+
 		// shallow clone
 		conflictless = !conflictless ? null : shallow_clone(conflictless);
 

@@ -1,1 +1,1 @@
-module.exports = require("./jot")
+module.exports = require("./jot");

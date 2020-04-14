@@ -6,7 +6,7 @@
 	Source and target are strings that are paths in the JSON document
 	to a value following the JSONPointer specification (RFC 6901).
 	The paths must exist --- a final dash in a path to refer to the
-	nonexistentent element after the end of an array is not valid.
+	nonexistent element after the end of an array is not valid.
 	*/
 	
 var util = require("util");
@@ -42,8 +42,8 @@ exports.COPY.prototype = Object.create(jot.BaseOperation.prototype); // inherit
 jot.add_op(exports.COPY, exports, 'COPY');
 
 function serialize_pointer(jp) {
-    return (jp.path.map(function(part) { return "/" + part.replace(/~/g,'~0').replace(/\//g,'~1') })
-    	.join(""));
+	  return (jp.path.map(function(part) { return "/" + part.replace(/~/g,'~0').replace(/\//g,'~1') })
+	  	.join(""));
 }
 
 exports.COPY.prototype.inspect = function(depth) {
@@ -55,7 +55,7 @@ exports.COPY.prototype.inspect = function(depth) {
 exports.COPY.prototype.visit = function(visitor) {
 	// A simple visitor paradigm. Replace this operation instance itself
 	// and any operation within it with the value returned by calling
-	// visitor on itself, or if the visitor returns anything falsey
+	// visitor on itself, or if the visitor returns anything falsy
 	// (probably undefined) then return the operation unchanged.
 	return visitor(this) || this;
 }

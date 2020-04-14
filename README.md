@@ -1,3 +1,37 @@
+
+Fork notes:
+
+This is a fork of JoshData's [jot](https://github.com/JoshData/jot) library. The edits in it allow for selection synchronization in [sundae-collab](https://github.com/prk3/sundae-collab-server) project. Feel free to experiment and contribute, but don't use this version for any serious applications.
+
+Changes:
+1. To delay the evaluation of jot.OPERATION references in operation files, rebase_functions can now be a function returning an array.
+1. All operations have access to `meta` io object. Meta stores data which does not belong to a document but is a side effect of collaboration over a document. Any operation can read meta io object's `in` meta and write `out` meta. This way the original api does not change.
+1. Apply methods receive `path` parameter - a JSON pointer to a field that is modified by an operation.
+1. `selection` property on meta holds selections in a document. Here is it's structure:
+```json
+{
+  "/description": { // JSON pointer to a field in a document
+    "userA": {      // id of a user making selection
+      "start": 20,  // selection start
+      "end": 25,    // selection end
+    },
+    "userB": {
+      "start": 4,
+      "end": 4,
+    },
+  },
+}
+```
+5. A new operation - SELECT has been added. It accepts a meta change, like `{ userA: { start: 5, end: 10 }}` and updates the meta object when applied. `null` instead of start + end object removes user's selection from meta. Only the element pointed by `path` will have it's selections updated.
+
+TODO:
+1. Think of possible problems with this API design.
+1. Make sure paths are passed properly to all operations.
+1. Make sure other operations, like PATH update selections properly.
+1. Rebasing a list of many PATCH and SELECT operations against another list of PATCH and SELECT produces operation that breaks intention preservation rule. I fixed this issue by reducing SELECTs in LIST's optimize function, but that's an ugly fix. A real solution would require much more effort and knowledge of how LIST rebase works.
+1. More tests.
+
+
 JSON Operational Transformation (JOT)
 =====================================
 
@@ -87,7 +121,7 @@ account the changes to the document made by the first user before they can be ap
 
 ### Transformation
 
-JOT provides an algorithm to transform the structured representation of changes so 
+JOT provides an algorithm to transform the structured representation of changes so
 that simultaneous changes can be combined sequentially.
 
 Continuing the example, we desire to transform the second user's changes so that
