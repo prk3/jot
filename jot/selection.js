@@ -236,7 +236,7 @@ exports.SELECT.prototype.rebase_functions = function () {
 						if (newSelections[key] !== null) {
 							newSelections[key] = exports.adjustRange(
 								newSelections[key],
-								hunk.offset,
+								start + hunk.offset,
 								hunk.length,
 								hunk.op.value.length
 							);

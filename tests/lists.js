@@ -1,5 +1,5 @@
-const tap = require('tap');
-const jot = require('..');
+var tap = require('tap');
+var jot = require('..');
 
 tap.test('lists', function (t) {
 

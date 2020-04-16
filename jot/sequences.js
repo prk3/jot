@@ -295,21 +295,28 @@ exports.PATCH.prototype.apply = function (document, meta, path = '') {
 
 		if (documentSelections[path]) {
 			var fieldSelections = Object.assign({}, documentSelections[path] || {});
+			var start = 0;
 
 			this.hunks.forEach(function (hunk) {
-				if (!(hunk.op instanceof values.SET) || (hunk.length === 0 && hunk.op.value.length === 0)) {
+				if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
+					start += hunk.offset + hunk.length;
 					return;
 				}
-
-				for (var id in fieldSelections) {
-					fieldSelections[id] = selection.adjustRange(
-						fieldSelections[id],
-						hunk.offset,
-						hunk.length,
-						hunk.op.value.length
-					);
+				if (hunk.op instanceof jot.SET) {
+					for (var id in fieldSelections) {
+						fieldSelections[id] = selection.adjustRange(
+							fieldSelections[id],
+							start + hunk.offset,
+							hunk.length,
+							hunk.op.value.length
+						);
+					}
+					start += hunk.offset + hunk.op.value.length - hunk.length;
+					return;
 				}
+				throw new Error('Unsupported hunk operation.');
 			});
+
 			documentSelections[path] = fieldSelections;
 		}
 		if (!meta.out) {

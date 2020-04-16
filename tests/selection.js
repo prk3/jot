@@ -1,5 +1,5 @@
-const tap = require('tap');
-const jot = require('..');
+var tap = require('tap');
+var jot = require('..');
 
 tap.test('selection', function (t) {
 
@@ -50,13 +50,45 @@ tap.test('selection', function (t) {
 			new jot.APPLY('hello', new jot.SELECT('x', { start: 2, end: 2 })),
 		]).simplify();
 
-		const newDoc = op.apply(doc, meta);
+		var newDoc = op.apply(doc, meta);
 
 		t.deepEqual(newDoc, { hello: '12world' });
 		t.deepEqual(meta.out, {
 			selections: {
 				'/hello': {
-					'x': { start: 2, end: 2 },
+					x: { start: 2, end: 2 },
+				},
+			},
+		});
+		t.end();
+	});
+
+	t.test('works with multiple-hunk splices', function (t) {
+		// test applying multiple-hunk splices on existing document and selections
+		var doc = 'abc def ghi';
+		var meta = {
+			in: {
+				selections: {
+					'': {
+						a: { start: 1, end: 2 },
+						b: { start: 9, end: 10 },
+					},
+				},
+			},
+		};
+		var op = new jot.LIST([
+			new jot.SPLICE(5, 0, '-'),
+			new jot.SPLICE(7, 0, '-'),
+		]).simplify();
+
+		var newDoc = op.apply(doc, meta);
+
+		t.equal(newDoc, 'abc d-e-f ghi');
+		t.deepEqual(meta.out, {
+			selections: {
+				'': {
+					a: { start: 1, end: 2 },
+					b: { start: 11, end: 12 },
 				},
 			},
 		});
