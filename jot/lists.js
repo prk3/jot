@@ -119,20 +119,27 @@ exports.LIST.prototype.simplify = function (aggressive) {
 	}
 	function adjust_select(select, patch) {
 		var newSelections = Object.assign({}, select.selections);
+		var start = 0;
 		patch.hunks.forEach(function (hunk) {
-			if (!(hunk.op instanceof jot.SET) || (hunk.length === 0 && hunk.op.value.length === 0)) {
+			if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
+				start += hunk.offset + hunk.length;
 				return;
 			}
-			for (var key in newSelections) {
-				if (newSelections[key] !== null) {
-					newSelections[key] = selection.adjustRange(
-						newSelections[key],
-						hunk.offset,
-						hunk.length,
-						hunk.op.value.length
-					);
+			if (hunk.op instanceof jot.SET) {
+				for (var key in newSelections) {
+					if (newSelections[key] !== null) {
+						newSelections[key] = selection.adjustRange(
+							newSelections[key],
+							start + hunk.offset,
+							hunk.length,
+							hunk.op.value.length
+						);
+					}
 				}
+				start += hunk.offset + hunk.op.value.length - hunk.length;
+				return;
 			}
+			throw new Error('Unsupported hunk operation.');
 		});
 		return new jot.SELECT(newSelections);
 	}
