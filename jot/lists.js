@@ -8,11 +8,11 @@
 
 var util = require("util");
 
-var shallow_clone = require('shallow-clone');
+var shallow_clone = require("shallow-clone");
 
 var jot = require("./index.js");
 var values = require("./values.js");
-var selection = require("./selection");
+var sequences = require("./sequences");
 
 exports.module_name = 'lists'; // for serialization/deserialization
 
@@ -55,10 +55,10 @@ exports.LIST.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.LIST(ops);
 }
 
-exports.LIST.prototype.apply = function (document, meta, path = '') {
+exports.LIST.prototype.apply = function (document, metaRef, path = "") {
 	/* Applies the operation to a document.*/
 	for (var i = 0; i < this.ops.length; i++)
-		document = this.ops[i].apply(document, meta, path);
+		document = this.ops[i].apply(document, metaRef, path);
 	return document;
 }
 
@@ -93,7 +93,7 @@ exports.LIST.prototype.simplify = function (aggressive) {
 
 			// Use the atomic_composition as the next op to add. On the next iteration
 			// try composing it with the new last element of new_ops.
-			op = c;
+			op = c.simplify();
 		}
 
 		// Don't add to the new list if it is a no-op.
@@ -117,32 +117,7 @@ exports.LIST.prototype.simplify = function (aggressive) {
 	function is_select(op) {
 		return op instanceof jot.SELECT;
 	}
-	function adjust_select(select, patch) {
-		var newSelections = Object.assign({}, select.selections);
-		var start = 0;
-		patch.hunks.forEach(function (hunk) {
-			if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
-				start += hunk.offset + hunk.length;
-				return;
-			}
-			if (hunk.op instanceof jot.SET) {
-				for (var key in newSelections) {
-					if (newSelections[key] !== null) {
-						newSelections[key] = selection.adjustRange(
-							newSelections[key],
-							start + hunk.offset,
-							hunk.length,
-							hunk.op.value.length
-						);
-					}
-				}
-				start += hunk.offset + hunk.op.value.length - hunk.length;
-				return;
-			}
-			throw new Error('Unsupported hunk operation.');
-		});
-		return new jot.SELECT(newSelections);
-	}
+
 	if (new_ops.every(is_reduceable)) {
 		var first_select_index = new_ops.findIndex(is_select);
 		if (first_select_index === -1 || first_select_index === new_ops.length - 1) {
@@ -155,15 +130,13 @@ exports.LIST.prototype.simplify = function (aggressive) {
 		for (var i = first_select_index; i < new_ops.length; /* no increment */) {
 			if (new_ops[i] instanceof jot.SELECT) {
 				// Merge selects (next select has higher priority).
-				current_select = new jot.SELECT(Object.assign(
-					{},
-					current_select.selections,
-					new_ops[i].selections
-				));
+				current_select = current_select.compose(new_ops[i]);
 				new_ops.splice(i, 1);
 			} else {
 				// Adjust ranges against the PATCH op.
-				current_select = adjust_select(current_select, new_ops[i]);
+				current_select = new jot.SELECT(
+					sequences.adjustSelectionsAgainstPatch(current_select.selections, new_ops[i])
+				);
 				i++;
 			}
 		}

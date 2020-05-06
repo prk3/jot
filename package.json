@@ -5,28 +5,26 @@
   "bugs": {
     "url": "https://github.com/joshdata/jot/issues"
   },
-  "bundleDependencies": false,
   "dependencies": {
     "deep-equal": "^2.0.1",
     "diff": "^4.0.2",
-    "generic-diff": "*",
-    "jsonpatch": "*",
+    "generic-diff": "^1.0.1",
+    "jsonpatch": "^3.0.1",
     "shallow-clone": "^3.0.1"
   },
   "deprecated": false,
   "description": "JSON Operational Transformation",
   "devDependencies": {
-    "connect": "*",
-    "tap": "*"
+    "tap": "^14.10.7"
   },
-  "homepage": "https://github.com/joshdata/jot#readme",
+  "homepage": "https://github.com/prk3/jot#readme",
   "name": "jot",
   "repository": {
     "type": "git",
-    "url": "git://github.com/joshdata/jot.git"
+    "url": "git://github.com/prk3/jot.git"
   },
   "scripts": {
     "test": "tap --cov tests/*.js"
   },
-  "version": "0.0.1"
+  "version": "0.1.0"
 }

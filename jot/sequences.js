@@ -79,8 +79,8 @@ var shallow_clone = require('shallow-clone');
 
 var jot = require("./index.js");
 var values = require("./values.js");
-var LIST = require("./lists.js").LIST;
 var selection = require("./selection.js");
+var LIST = require("./lists.js").LIST;
 
 // utilities
 
@@ -253,7 +253,7 @@ exports.PATCH.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.PATCH(hunks);
 }
 
-exports.PATCH.prototype.apply = function (document, meta, path = '') {
+exports.PATCH.prototype.apply = function (document, metaRef, path = '') {
 	/* Applies the operation to a document. Returns a new sequence that is
 		 the same type as document but with the hunks applied. */
 
@@ -270,7 +270,7 @@ exports.PATCH.prototype.apply = function (document, meta, path = '') {
 
 	  // Append new content.
 	  // TODO transform path somehow?
-		var new_value = hunk.op.apply(document.slice(index, index+hunk.length), meta, path);
+		var new_value = hunk.op.apply(document.slice(index, index+hunk.length), metaRef, path);
 
 		if (typeof document == "string" && typeof new_value != "string")
 			throw new Error("operation yielded invalid substring");
@@ -287,42 +287,23 @@ exports.PATCH.prototype.apply = function (document, meta, path = '') {
 	ret = concat2(ret, document.slice(index));
 
 	// Update selections.
-	if (meta && meta.in) {
+	if (metaRef) {
 		var documentSelections = Object.assign(
 			{},
-			(meta.out && meta.out.selections) || meta.in.selections || {},
+			metaRef.meta && metaRef.meta.selections,
 		);
 
 		if (documentSelections[path]) {
-			var fieldSelections = Object.assign({}, documentSelections[path] || {});
-			var start = 0;
-
-			this.hunks.forEach(function (hunk) {
-				if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
-					start += hunk.offset + hunk.length;
-					return;
-				}
-				if (hunk.op instanceof jot.SET) {
-					for (var id in fieldSelections) {
-						fieldSelections[id] = selection.adjustRange(
-							fieldSelections[id],
-							start + hunk.offset,
-							hunk.length,
-							hunk.op.value.length
-						);
-					}
-					start += hunk.offset + hunk.op.value.length - hunk.length;
-					return;
-				}
-				throw new Error('Unsupported hunk operation.');
-			});
-
-			documentSelections[path] = fieldSelections;
+			documentSelections[path] = exports.adjustSelectionsAgainstPatch(
+				documentSelections[path],
+				this,
+			);
 		}
-		if (!meta.out) {
-			meta.out = {};
-		}
-		meta.out.selections = documentSelections;
+		metaRef.meta = Object.assign(
+			{},
+			metaRef.meta,
+			{ selections: documentSelections },
+		);
 	}
 
 	return ret;
@@ -934,10 +915,6 @@ exports.PATCH.prototype.rebase_functions = [
 		// Return the new operations.
 		return rebase_patches(this, other, conflictless);
 	}],
-	[selection.SELECT, function(other, conflictless) {
-		// Selections will be fixed in apply method.
-		return [this, other];
-	}]
 ];
 
 
@@ -949,6 +926,37 @@ exports.PATCH.prototype.get_length_change = function (old_length) {
 		dlen += hunk.op.get_length_change(hunk.length);
 	});
 	return dlen;
+}
+
+exports.adjustSelectionsAgainstPatch = function (selections, patch) {
+	var newSelections = Object.assign({}, selections);
+	var start = 0;
+
+	patch.hunks.forEach(function (hunk) {
+		if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
+			start += hunk.offset + hunk.length;
+			return;
+		}
+		if (hunk.op instanceof jot.SET) {
+			for (var id in selections) {
+				if (newSelections[id] === null) {
+					newSelections[id] = null;
+				} else {
+					newSelections[id] = selection.adjustRange(
+						newSelections[id],
+						start + hunk.offset,
+						hunk.length,
+						hunk.op.value.length
+					);
+				}
+			}
+			start += hunk.offset + hunk.op.value.length - hunk.length;
+			return;
+		}
+		throw new Error('Unsupported hunk operation.');
+	});
+
+	return newSelections;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -974,7 +982,7 @@ exports.MAP.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.MAP(jot.opFromJSON(json.op, protocol_version, op_map));
 }
 
-exports.MAP.prototype.apply = function (document, meta, path = '') {
+exports.MAP.prototype.apply = function (document, metaRef, path = '') {
 	/* Applies the operation to a document. Returns a new sequence that is
 		 the same type as document but with the element modified. */
 
@@ -989,7 +997,7 @@ exports.MAP.prototype.apply = function (document, meta, path = '') {
 
 	// Apply operation to each element.
 	for (var i = 0; i < d.length; i++) {
-		d[i] = this.op.apply(d[i], meta, path);
+		d[i] = this.op.apply(d[i], metaRef, path);
 
 		// An operation on strings must return a single character.
 		if (typeof document == 'string' && (typeof d[i] != 'string' || d[i].length != 1))

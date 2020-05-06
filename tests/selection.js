@@ -13,11 +13,27 @@ tap.test('selection', function (t) {
 		t.end();
 	});
 
+	t.test('can be used with apply and applyWithMeta', function (t) {
+		var doc = { hello: 'world' };
+		var op = new jot.APPLY('hello', new jot.SELECT('x', { start: 1, end: 3 }));
+
+		var newMetaRef1 = { meta: {} };
+		var newDoc1 = op.apply(doc, newMetaRef1);
+
+		var res = op.applyWithMeta(doc, {});
+		var newDoc2 = res[0];
+		var newMeta2 = res[1];
+
+		t.deepEqual(newMeta2, newMetaRef1.meta);
+		t.deepEqual(newDoc2, newDoc1);
+		t.end();
+	});
+
 	t.test('does not change value', function (t) {
 		var doc = { hello: 'world' };
-		var meta = { in: {} };
+		var metaRef = { meta: {} };
 		var op = new jot.APPLY('hello', new jot.SELECT('x', { start: 1, end: 3 }));
-		var newDoc = op.apply(doc, meta);
+		var newDoc = op.apply(doc, metaRef);
 
 		t.deepEqual(newDoc, doc);
 		t.end();
@@ -25,12 +41,12 @@ tap.test('selection', function (t) {
 
 	t.test('sets meta correctly', function (t) {
 		var doc = { hello: 'world' };
-		var meta = { in: {} };
+		var metaRef = { meta: {} };
 		var op = new jot.APPLY('hello', new jot.SELECT('x', { start: 1, end: 3 }));
 
-		op.apply(doc, meta);
+		op.apply(doc, metaRef);
 
-		t.deepEqual(meta.out, {
+		t.deepEqual(metaRef.meta, {
 			selections: {
 				'/hello': {
 					x: { start: 1, end: 3 },
@@ -42,7 +58,7 @@ tap.test('selection', function (t) {
 
 	t.test('works with splices in a list', function (t) {
 		var doc = { hello: 'world' };
-		var meta = { in: {} };
+		var metaRef = { meta: {} };
 		var op = new jot.LIST([
 			new jot.APPLY('hello', new jot.SPLICE(0, 0, '1')),
 			new jot.APPLY('hello', new jot.SELECT('x', { start: 1, end: 1 })),
@@ -50,10 +66,10 @@ tap.test('selection', function (t) {
 			new jot.APPLY('hello', new jot.SELECT('x', { start: 2, end: 2 })),
 		]).simplify();
 
-		var newDoc = op.apply(doc, meta);
+		var newDoc = op.apply(doc, metaRef);
 
 		t.deepEqual(newDoc, { hello: '12world' });
-		t.deepEqual(meta.out, {
+		t.deepEqual(metaRef.meta, {
 			selections: {
 				'/hello': {
 					x: { start: 2, end: 2 },
@@ -66,8 +82,8 @@ tap.test('selection', function (t) {
 	t.test('works with multiple-hunk splices', function (t) {
 		// test applying multiple-hunk splices on existing document and selections
 		var doc = 'abc def ghi';
-		var meta = {
-			in: {
+		var metaRef = {
+			meta: {
 				selections: {
 					'': {
 						a: { start: 1, end: 2 },
@@ -81,10 +97,10 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(7, 0, '-'),
 		]).simplify();
 
-		var newDoc = op.apply(doc, meta);
+		var newDoc = op.apply(doc, metaRef);
 
 		t.equal(newDoc, 'abc d-e-f ghi');
-		t.deepEqual(meta.out, {
+		t.deepEqual(metaRef.meta, {
 			selections: {
 				'': {
 					a: { start: 1, end: 2 },
@@ -102,11 +118,11 @@ tap.test('selection', function (t) {
 			new jot.SELECT('a', { start: 1, end: 2 }),
 			new jot.SELECT('c', { start: 8, end: 9 }),
 		]).simplify();
-		var metaAlice = { in: {} };
-		var docAlice = alice.apply(doc, metaAlice);
+		var metaRefAlice = { meta: {} };
+		var docAlice = alice.apply(doc, metaRefAlice);
 
 		t.equal(docAlice, 'aaa bb ccc');
-		t.deepEqual(metaAlice.out, {
+		t.deepEqual(metaRefAlice.meta, {
 			selections: {
 				'': {
 					a: { start: 1, end: 2 },
@@ -119,11 +135,11 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(5, 0, 'xxx'),
 			new jot.SELECT('b', { start: 8, end: 8 }),
 		]).simplify();
-		var metaBob = { in: {} };
-		var docBob = bob.apply(doc, metaBob);
+		var metaRefBob = { meta: {} };
+		var docBob = bob.apply(doc, metaRefBob);
 
 		t.equal(docBob, 'aaa bxxxb ccc');
-		t.deepEqual(metaBob.out, {
+		t.deepEqual(metaRefBob.meta, {
 			selections: {
 				'': {
 					b: { start: 8, end: 8 },
@@ -132,11 +148,11 @@ tap.test('selection', function (t) {
 		});
 
 		var bobRebaseAlice = bob.rebase(alice, { document: doc });
-		var metaBobRebaseAlice = { in: metaAlice.out };
-		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaBobRebaseAlice);
+		var metaRefBobRebaseAlice = { meta: metaRefAlice.meta };
+		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaRefBobRebaseAlice);
 
 		t.equal(docBobRebaseAlice, 'aaa bxxxb ccc');
-		t.deepEqual(metaBobRebaseAlice.out, {
+		t.deepEqual(metaRefBobRebaseAlice.meta, {
 			selections: {
 				'': {
 					a: { start: 1, end: 2 },
@@ -147,11 +163,11 @@ tap.test('selection', function (t) {
 		});
 
 		var aliceRebaseBob = alice.rebase(bob, { document: doc });
-		var metaAliceRebaseBob = { in: metaBob.out };
-		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaAliceRebaseBob);
+		var metaRefAliceRebaseBob = { meta: metaRefBob.meta };
+		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaRefAliceRebaseBob);
 
 		t.equal(docAliceRebaseBob, 'aaa bxxxb ccc');
-		t.deepEqual(metaAliceRebaseBob.out, {
+		t.deepEqual(metaRefAliceRebaseBob.meta, {
 			selections: {
 				'': {
 					a: { start: 1, end: 2 },
@@ -167,12 +183,10 @@ tap.test('selection', function (t) {
 	t.test('rebase preserves intentions 2', function (t) {
 		var doc = 'one \ntwo \nthree \n';
 		var meta = {
-			in: {
-				selections: {
-					'': {
-						alice: { start: 0, end: 0 },
-						bob: { start: 17, end: 17 },
-					},
+			selections: {
+				'': {
+					alice: { start: 0, end: 0 },
+					bob: { start: 17, end: 17 },
 				},
 			},
 		};
@@ -181,11 +195,11 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(4, 0, 'orange'),
 			new jot.SELECT('alice', { start: 10, end: 10 }),
 		]).simplify();
-		var metaAlice = Object.assign({}, meta);
-		var docAlice = alice.apply(doc, metaAlice);
+		var metaRefAlice = { meta };
+		var docAlice = alice.apply(doc, metaRefAlice);
 
 		t.equal(docAlice, 'one orange\ntwo \nthree \n');
-		t.deepEqual(metaAlice.out, {
+		t.deepEqual(metaRefAlice.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },
@@ -198,11 +212,11 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(9, 0, 'bananas'),
 			new jot.SELECT('bob', { start: 16, end: 16 }),
 		]).simplify();
-		var metaBob = Object.assign({}, meta);
-		var docBob = bob.apply(doc, metaBob);
+		var metaRefBob = { meta };
+		var docBob = bob.apply(doc, metaRefBob);
 
 		t.equal(docBob, 'one \ntwo bananas\nthree \n');
-		t.deepEqual(metaBob.out, {
+		t.deepEqual(metaRefBob.meta, {
 			selections: {
 				'': {
 					alice: { start: 0, end: 0 },
@@ -212,11 +226,11 @@ tap.test('selection', function (t) {
 		});
 
 		var bobRebaseAlice = bob.rebase(alice, { document: doc });
-		var metaBobRebaseAlice = { in: metaAlice.out };
-		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaBobRebaseAlice);
+		var metaRefBobRebaseAlice = { meta: metaRefAlice.meta };
+		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaRefBobRebaseAlice);
 
 		t.equal(docBobRebaseAlice, 'one orange\ntwo bananas\nthree \n');
-		t.deepEqual(metaBobRebaseAlice.out, {
+		t.deepEqual(metaRefBobRebaseAlice.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },
@@ -226,11 +240,11 @@ tap.test('selection', function (t) {
 		});
 
 		var aliceRebaseBob = alice.rebase(bob, { document: doc });
-		var metaAliceRebaseBob = { in: metaBob.out };
-		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaAliceRebaseBob);
+		var metaRefAliceRebaseBob = { meta: metaRefBob.meta };
+		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaRefAliceRebaseBob);
 
 		t.equal(docAliceRebaseBob, 'one orange\ntwo bananas\nthree \n');
-		t.deepEqual(metaAliceRebaseBob.out, {
+		t.deepEqual(metaRefAliceRebaseBob.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },
@@ -245,12 +259,10 @@ tap.test('selection', function (t) {
 	t.test('rebase preserves intentions 3', function (t) {
 		var doc = 'one \ntwo \nthree \n';
 		var meta = {
-			in: {
-				selections: {
-					'': {
-						alice: { start: 0, end: 0 },
-						bob: { start: 17, end: 17 },
-					},
+			selections: {
+				'': {
+					alice: { start: 0, end: 0 },
+					bob: { start: 17, end: 17 },
 				},
 			},
 		};
@@ -270,11 +282,11 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(9, 0, 'e'),
 			new jot.SELECT('alice', { start: 10, end: 10 }),
 		]).simplify();
-		var metaAlice = Object.assign({}, meta);
-		var docAlice = alice.apply(doc, metaAlice);
+		var metaRefAlice = { meta };
+		var docAlice = alice.apply(doc, metaRefAlice);
 
 		t.equal(docAlice, 'one orange\ntwo \nthree \n');
-		t.deepEqual(metaAlice.out, {
+		t.deepEqual(metaRefAlice.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },
@@ -300,11 +312,11 @@ tap.test('selection', function (t) {
 			new jot.SPLICE(15, 0, 's'),
 			new jot.SELECT('bob', { start: 16, end: 16 }),
 		]).simplify();
-		var metaBob = Object.assign({}, meta);
-		var docBob = bob.apply(doc, metaBob);
+		var metaRefBob = { meta };
+		var docBob = bob.apply(doc, metaRefBob);
 
 		t.equal(docBob, 'one \ntwo bananas\nthree \n');
-		t.deepEqual(metaBob.out, {
+		t.deepEqual(metaRefBob.meta, {
 			selections: {
 				'': {
 					alice: { start: 0, end: 0 },
@@ -314,11 +326,11 @@ tap.test('selection', function (t) {
 		});
 
 		var bobRebaseAlice = bob.rebase(alice, { document: doc });
-		var metaBobRebaseAlice = { in: metaAlice.out };
-		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaBobRebaseAlice);
+		var metaRefBobRebaseAlice = { meta: metaRefAlice.meta };
+		var docBobRebaseAlice = bobRebaseAlice.apply(docAlice, metaRefBobRebaseAlice);
 
 		t.equal(docBobRebaseAlice, 'one orange\ntwo bananas\nthree \n');
-		t.deepEqual(metaBobRebaseAlice.out, {
+		t.deepEqual(metaRefBobRebaseAlice.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },
@@ -328,11 +340,11 @@ tap.test('selection', function (t) {
 		});
 
 		var aliceRebaseBob = alice.rebase(bob, { document: doc });
-		var metaAliceRebaseBob = { in: metaBob.out };
-		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaAliceRebaseBob);
+		var metaRefAliceRebaseBob = { meta: metaRefBob.meta };
+		var docAliceRebaseBob = aliceRebaseBob.apply(docBob, metaRefAliceRebaseBob);
 
 		t.equal(docAliceRebaseBob, 'one orange\ntwo bananas\nthree \n');
-		t.deepEqual(metaAliceRebaseBob.out, {
+		t.deepEqual(metaRefAliceRebaseBob.meta, {
 			selections: {
 				'': {
 					alice: { start: 10, end: 10 },

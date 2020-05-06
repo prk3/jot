@@ -120,7 +120,7 @@ exports.APPLY.internalFromJSON = function(json, protocol_version, op_map) {
 	return new exports.APPLY(ops);
 }
 
-exports.APPLY.prototype.apply = function (document, meta, pointer = "") {
+exports.APPLY.prototype.apply = function (document, metaRef, pointer = "") {
 	/* Applies the operation to a document. Returns a new object that is
 	   the same type as document but with the change made. */
 
@@ -131,7 +131,7 @@ exports.APPLY.prototype.apply = function (document, meta, pointer = "") {
 
 	// Apply.
 	for (var key in this.ops) {
-		var value = this.ops[key].apply(d[key], meta, pointer + '/' + key);
+		var value = this.ops[key].apply(d[key], metaRef, pointer + "/" + key);
 		if (value === exports.MISSING)
 			delete d[key]; // key was removed
 		else

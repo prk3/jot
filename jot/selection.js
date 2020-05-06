@@ -1,4 +1,5 @@
-var util = require('util');
+var util = require("util");
+var sequences = require("./sequences");
 var jot = require("./index.js");
 
 exports.module_name = 'selection';
@@ -149,29 +150,31 @@ exports.SELECT.internalFromJSON = function (json, protocol_version, op_map) {
 	return new exports.SELECT(json.selections);
 }
 
-exports.SELECT.prototype.apply = function (document, meta, path = '') {
-	if (meta && meta.in) {
+exports.SELECT.prototype.apply = function (document, metaRef, path = "") {
+	if (metaRef) {
 		var documentSelections = Object.assign(
 			{},
-			(meta.out && meta.out.selections) || meta.in.selections || {}
+			metaRef.meta && metaRef.meta.selections,
 		);
 		var fieldSelections = Object.assign(
-			{}, documentSelections[path] || {},
-			this.selections
+			{},
+			documentSelections[path],
+			this.selections,
 		);
-		documentSelections[path] = fieldSelections;
 		for (var id in fieldSelections) {
 			if (fieldSelections[id] === null) {
 				delete fieldSelections[id];
 			}
 		}
+		documentSelections[path] = fieldSelections;
 		if (Object.keys(fieldSelections).length === 0) {
 			delete documentSelections[path];
 		}
-		if (!meta.out) {
-			meta.out = {};
-		}
-		meta.out.selections = documentSelections;
+		metaRef.meta = Object.assign(
+			{},
+			metaRef.meta,
+			{ selections: documentSelections },
+		);
 	}
 	return document;
 }
@@ -215,38 +218,15 @@ exports.SELECT.prototype.atomic_compose = function (other) {
 }
 
 exports.SELECT.prototype.rebase_functions = function () {
-	// rebase_functions is a function because we need to delay
-	// evaluation of jot.PATCH until PATCH it is actually defined
+	// Rebase_functions is a function because we need to delay
+	// evaluation of jot.PATCH until PATCH it is actually defined.
 	return [
 		[exports.SELECT, function (other, conflictless) {
-			// nothing complex here, we assume people control their selections only
-			var newSelections = Object.assign({}, this.selections, other.selections);
-			return [new exports.SELECT(newSelections), other];
+			// Nothing complex here, we assume people control only their selections.
+			return [this, other];
 		}],
 		[jot.PATCH, function (other, conflictless) {
-			var newSelections = Object.assign({}, this.selections);
-			var start = 0;
-			other.hunks.forEach(function (hunk) {
-				if (hunk.op instanceof jot.MAP || hunk.op instanceof jot.NO_OP) {
-					start += hunk.offset + hunk.length;
-					return;
-				}
-				if (hunk.op instanceof jot.SET) {
-					for (var key in newSelections) {
-						if (newSelections[key] !== null) {
-							newSelections[key] = exports.adjustRange(
-								newSelections[key],
-								start + hunk.offset,
-								hunk.length,
-								hunk.op.value.length
-							);
-						}
-					}
-					start += hunk.offset + hunk.op.value.length - hunk.length;
-					return;
-				}
-				throw new Error('Unsupported hunk operation.');
-			});
+			var newSelections = sequences.adjustSelectionsAgainstPatch(this.selections, other);
 			return [new exports.SELECT(newSelections), other];
 		}],
 	];

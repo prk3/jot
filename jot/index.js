@@ -182,6 +182,12 @@ exports.BaseOperation.prototype.compose = function(other, no_list) {
 	return new lists.LIST([this, other]).simplify();
 }
 
+exports.BaseOperation.prototype.applyWithMeta = function (document, meta) {
+	var metaObj = { meta };
+	var newDoc = this.apply(document, metaObj);
+	return [newDoc, metaObj.meta];
+}
+
 exports.BaseOperation.prototype.rebase = function(other, conflictless, debug) {
 	/* Transforms this operation so that it can be composed *after* the other
 	   operation to yield the same logical effect as if it had been executed

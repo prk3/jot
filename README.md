@@ -5,7 +5,8 @@ This is a fork of JoshData's [jot](https://github.com/JoshData/jot) library. The
 
 Changes:
 1. To delay the evaluation of jot.OPERATION references in operation files, rebase_functions can now be a function returning an array.
-1. All operations have access to `meta` io object. Meta stores data which does not belong to a document but is a side effect of collaboration over a document. Any operation can read meta io object's `in` meta and write `out` meta. This way the original api does not change.
+1. All operations have access to `metaRef` object in apply method. It stores a reference to metadata, which is information that does not belong to a document, but is rather a side effect of collaboration over a document. Any operation can read `meta` property from `metaRef` and override it to update metadata. With this approach the original API stays backwards compatible.
+1. A new method - `applyWithMeta` has been added to the base operation. It's there only for convenience. Under the hood, meta is passed using metaRef object.
 1. Apply methods receive `path` parameter - a JSON pointer to a field that is modified by an operation.
 1. `selection` property on meta holds selections in a document. Here is it's structure:
 ```json
@@ -22,14 +23,13 @@ Changes:
   },
 }
 ```
-5. A new operation - SELECT has been added. It accepts a meta change, like `{ userA: { start: 5, end: 10 }}` and updates the meta object when applied. `null` instead of start + end object removes user's selection from meta. Only the element pointed by `path` will have it's selections updated.
+5. A new operation - SELECT has been added. It accepts a meta change, like `{ userA: { start: 5, end: 10 }}` and updates the meta when applied. `null` instead of start + end object removes user's selection from meta. Only the element pointed by `path` will have it's selections updated.
 
 TODO:
-1. Think of possible problems with this API design.
 1. Make sure paths are passed properly to all operations.
-1. Make sure other operations, like PATH update selections properly.
-1. Rebasing a list of many PATCH and SELECT operations against another list of PATCH and SELECT produces operation that breaks intention preservation rule. I fixed this issue by reducing SELECTs in LIST's optimize function, but that's an ugly fix. A real solution would require much more effort and knowledge of how LIST rebase works.
-1. More tests.
+1. Make sure other operations, like COPY update selections properly.
+1. Trippe check rebase of SELECT and PATCH operations.
+1. Add more tests.
 
 
 JSON Operational Transformation (JOT)

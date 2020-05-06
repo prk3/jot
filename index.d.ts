@@ -16,7 +16,8 @@ declare module 'jot' {
 	interface Operation {
 		inspect(): string;
 		isNoOp(): boolean;
-		apply(document: Document, meta?: { in: Meta, out?: Meta }): Document;
+		apply(document: Document, metaRef?: { meta: Meta }): Document;
+		applyWithMeta(document: Document, meta: Meta): [Document, Meta];
 		simplify(): Operation;
 		drilldown(index_or_key: number | string): Operation;
 		inverse(document: Document): Operation;
